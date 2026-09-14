@@ -1,0 +1,1511 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#ff3038">
+  <meta name="description" content="Interactive news and community comments demo">
+  <link rel="icon" href="data:,">
+  <title>News Community Demo</title>
+  <style>
+    /* Keep prototype text selectable when the browser annotation layer is active. */
+    :root,
+    :root body,
+    :root body * {
+      -webkit-user-select: text !important;
+      user-select: text !important;
+      -webkit-touch-callout: default;
+    }
+
+    html,
+    html body,
+    html body * {
+      -webkit-user-select: text !important;
+      user-select: text !important;
+    }
+
+    :root {
+      --red: #ff3038;
+      --ink: #17191e;
+      --muted: #7c828c;
+      --line: #e9ebef;
+      --soft: #f5f7fc;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      min-width: 320px;
+      overflow: auto;
+      background: #e9edf2;
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+      letter-spacing: 0;
+    }
+
+    button { font: inherit; }
+
+    .demo-shell {
+      min-height: 100dvh;
+      padding: 12px 12px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .demo-switcher {
+      width: min(390px, 100%);
+      padding: 4px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 4px;
+      flex: none;
+      border: 1px solid #d9dde5;
+      border-radius: 8px;
+      background: rgba(255,255,255,.82);
+      box-shadow: 0 8px 24px rgba(17, 24, 39, .08);
+    }
+
+    .demo-switcher button {
+      min-width: 0;
+      min-height: 42px;
+      padding: 5px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: #7c828c;
+      cursor: pointer;
+    }
+
+    .demo-switcher button strong {
+      font-size: 12px;
+      line-height: 1.1;
+    }
+
+    .demo-switcher button small {
+      font-size: 9px;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+
+    .demo-switcher button.active {
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 0 2px 8px rgba(17, 24, 39, .1);
+    }
+
+    .demo-switcher button.active strong::after {
+      content: "";
+      width: 18px;
+      height: 2px;
+      margin: 4px auto 0;
+      display: block;
+      background: var(--red);
+    }
+
+    .app {
+      width: 390px;
+      height: min(844px, calc(100dvh - 82px));
+      margin: 0 auto;
+      overflow: hidden;
+      position: relative;
+      background: #fff;
+      border: 1px solid #d9dde5;
+      border-radius: 42px;
+      box-shadow: 0 28px 70px rgba(17, 24, 39, .18);
+    }
+
+    .demo-shell.no-switcher {
+      padding: 0;
+      gap: 0;
+    }
+
+    .demo-shell.no-switcher .app { height: min(844px, 100dvh); }
+
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: none;
+      background: #fff;
+    }
+
+    .screen.active { display: flex; flex-direction: column; }
+
+    .status-bar {
+      height: 32px;
+      padding: 8px 15px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex: none;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .signals {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .battery {
+      width: 20px;
+      height: 9px;
+      border: 1.5px solid currentColor;
+      border-radius: 3px;
+      position: relative;
+    }
+
+    .battery::before {
+      content: "";
+      position: absolute;
+      inset: 1px 3px 1px 1px;
+      border-radius: 1px;
+      background: currentColor;
+    }
+
+    .battery::after {
+      content: "";
+      position: absolute;
+      right: -3px;
+      top: 2px;
+      width: 2px;
+      height: 4px;
+      border-radius: 0 1px 1px 0;
+      background: currentColor;
+    }
+
+    .home-head {
+      height: 112px;
+      flex: none;
+      position: relative;
+      overflow: hidden;
+      background: var(--red);
+      color: #fff;
+    }
+
+    .home-head::after {
+      content: "";
+      position: absolute;
+      width: 260px;
+      height: 116px;
+      top: 34px;
+      left: 64px;
+      border: 1px solid rgba(255,255,255,.28);
+      transform: rotate(14deg);
+      pointer-events: none;
+    }
+
+    .home-head .status-bar { position: relative; z-index: 1; }
+
+    .home-title {
+      height: 80px;
+      display: grid;
+      place-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .home-title strong { font-size: 20px; }
+
+    .profile-avatar {
+      width: 26px;
+      height: 26px;
+      position: absolute;
+      right: 16px;
+      border: 2px solid rgba(255,255,255,.8);
+      border-radius: 50%;
+      background: url("https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/avatar-1.jpg") center / cover;
+    }
+
+    .channel-tabs {
+      height: 43px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex: none;
+      overflow-x: auto;
+      border-bottom: 1px solid var(--line);
+      scrollbar-width: none;
+      color: #777d87;
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .channel-tabs::-webkit-scrollbar { display: none; }
+
+    .channel-tabs button {
+      height: 100%;
+      padding: 0;
+      flex: none;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font-weight: inherit;
+      position: relative;
+    }
+
+    .channel-tabs button.active { color: var(--ink); }
+
+    .channel-tabs button.active::after {
+      content: "";
+      height: 3px;
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--red);
+    }
+
+    .scroll-area {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      scrollbar-width: none;
+      overscroll-behavior: contain;
+    }
+
+    .scroll-area::-webkit-scrollbar { display: none; }
+
+    .home-feed { padding: 12px 12px 90px; }
+
+    .lead-story {
+      width: 100%;
+      height: 224px;
+      margin: 0 0 12px;
+      padding: 0;
+      overflow: hidden;
+      position: relative;
+      border: 0;
+      border-radius: 8px;
+      background: #ddd;
+      color: #fff;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .lead-story::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,.82));
+    }
+
+    .lead-story img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .story-badge {
+      position: absolute;
+      z-index: 1;
+      top: 13px;
+      left: 12px;
+      padding: 6px 10px;
+      border-radius: 14px;
+      background: var(--red);
+      font-size: 10px;
+      font-weight: 900;
+    }
+
+    .story-pages {
+      position: absolute;
+      z-index: 1;
+      top: 15px;
+      right: 12px;
+      display: flex;
+      gap: 4px;
+    }
+
+    .story-pages i {
+      width: 5px;
+      height: 3px;
+      background: rgba(255,255,255,.58);
+    }
+
+    .story-pages i:first-child { width: 12px; background: var(--red); }
+
+    .lead-copy {
+      position: absolute;
+      z-index: 1;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+    }
+
+    .lead-copy h1 {
+      max-width: 280px;
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.28;
+    }
+
+    .lead-copy small {
+      display: block;
+      margin-top: 7px;
+      color: rgba(255,255,255,.72);
+      font-size: 9px;
+      text-align: right;
+    }
+
+    .news-row {
+      padding: 8px 0 13px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 98px;
+      gap: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .news-row h2 {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.24;
+    }
+
+    .news-meta {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: #8b919c;
+      font-size: 10px;
+    }
+
+    .news-meta .comments-count {
+      margin-left: auto;
+      color: #32363d;
+    }
+
+    .news-thumb {
+      width: 98px;
+      height: 66px;
+      overflow: hidden;
+      align-self: center;
+      border-radius: 8px;
+      background: #e6e7eb;
+    }
+
+    .news-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .inline-comment {
+      grid-column: 1 / -1;
+      min-height: 50px;
+      position: relative;
+      padding: 9px 10px 7px;
+      display: grid;
+      grid-template-columns: 22px minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      border: 1px solid #e4e8f1;
+      border-radius: 8px;
+      background: var(--soft);
+      cursor: pointer;
+    }
+
+    .inline-comment { width: 100%; color: inherit; text-align: left; font: inherit; }
+
+    .comment-avatar {
+      width: 22px;
+      height: 22px;
+      border: 1px solid #fff;
+      border-radius: 50%;
+      background-position: center;
+      background-size: cover;
+      box-shadow: 0 0 0 1px #dfe3ea;
+    }
+
+    .inline-comment-content {
+      min-width: 0;
+      display: block;
+    }
+
+    .inline-comment-meta {
+      min-height: 26px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .inline-comment-author {
+      min-width: 0;
+      min-height: 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 1px;
+    }
+
+    .inline-comment-author strong {
+      overflow: hidden;
+      color: #252a33;
+      font-size: 10.5px;
+      font-weight: 800;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      line-height: 1.1;
+    }
+
+    .inline-comment-author small {
+      color: #8a919c;
+      font-size: 8.5px;
+      line-height: 1.15;
+      white-space: nowrap;
+    }
+
+    .inline-comment-content p {
+      margin: 4px 0 0;
+      display: -webkit-box;
+      overflow: hidden;
+      color: #363b44;
+      font-size: 11.5px;
+      line-height: 1.32;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .inline-like,
+    .comment-like {
+      margin-left: auto;
+      min-width: 58px;
+      min-height: 18px;
+      padding: 0 6px;
+      border: 1px solid #dfe4ed;
+      border-radius: 9px;
+      background: #fff;
+      box-shadow: 0 2px 5px rgba(23, 31, 45, .08);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      color: #777e89;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .inline-like .like-icon,
+    .comment-like .like-icon {
+      filter: grayscale(1);
+      opacity: .48;
+    }
+
+    .inline-like.is-liked,
+    .comment-like.is-liked {
+      border-color: #f0c36a;
+      background: #fff4d8;
+      color: #a86f00;
+    }
+
+    .inline-like.is-liked .like-icon,
+    .comment-like.is-liked .like-icon {
+      filter: none;
+      opacity: 1;
+    }
+
+    .news-community-band {
+      margin: 0 -12px;
+      padding: 16px 12px 20px;
+      background: #fbfcfe;
+      border-top: 7px solid #f4f4f5;
+    }
+
+    .community-head {
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 10px;
+    }
+
+    .community-head h2 { margin: 0; font-size: 17px; }
+    .community-head p { margin: 4px 0 0; color: #7c828c; font-size: 10px; }
+    .community-head > span { color: #858c96; font-size: 10px; font-weight: 800; white-space: nowrap; }
+    .community-comments { display: grid; gap: 8px; }
+    .community-comments .inline-comment { grid-column: auto; }
+
+    .team-band {
+      margin: 0 -12px;
+      padding: 15px 12px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      background: #eef5ff;
+    }
+
+    .team-band h2 { margin: 0; font-size: 17px; }
+    .team-band p { margin: 4px 0 0; color: #7c828c; font-size: 10px; }
+
+    .team-band button {
+      min-width: 54px;
+      height: 44px;
+      border: 1px solid #bfc5cf;
+      border-radius: 14px;
+      background: #fff;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .bottom-nav {
+      height: 72px;
+      padding: 5px 10px max(7px, env(safe-area-inset-bottom));
+      position: absolute;
+      z-index: 10;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      background: rgba(255,255,255,.96);
+      border-top: 1px solid var(--line);
+      backdrop-filter: blur(16px);
+    }
+
+    .nav-item {
+      border: 0;
+      background: transparent;
+      display: grid;
+      justify-items: center;
+      align-content: center;
+      gap: 4px;
+      color: #22262d;
+      font-size: 9px;
+      font-weight: 750;
+    }
+
+    .nav-item b { font-size: 17px; font-weight: 500; }
+    .nav-item.active { color: var(--red); }
+
+    .detail-head {
+      flex: none;
+      background: #fff;
+    }
+
+    .detail-toolbar {
+      height: 42px;
+      padding: 0 8px;
+      display: flex;
+      align-items: center;
+    }
+
+    .comments-page-title {
+      padding: 7px 16px 15px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .comments-page-title h1 {
+      margin: 0;
+      font-size: 21px;
+      line-height: 1.1;
+    }
+
+    .comments-page-title p {
+      margin: 6px 0 0;
+      color: #858c96;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .back-button {
+      width: 44px;
+      height: 44px;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      font-size: 29px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .article-scroll { padding-bottom: 34px; }
+
+    .article-title {
+      padding: 2px 16px 12px;
+    }
+
+    .article-title h1 {
+      margin: 0;
+      color: #131313;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 27px;
+      line-height: 1.02;
+    }
+
+    .article-meta {
+      margin-top: 12px;
+      display: flex;
+      gap: 14px;
+      color: #a0a3a8;
+      font-size: 10px;
+    }
+
+    .article-hero {
+      height: 224px;
+      margin: 0 12px 14px;
+      overflow: hidden;
+      border-radius: 8px;
+      background: #ddd;
+    }
+
+    .article-hero img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .comment-carousel {
+      margin: 0 14px 18px;
+      padding: 12px 0;
+      border-top: 1px solid #eeeef1;
+      border-bottom: 1px solid #eeeef1;
+    }
+
+    .carousel-head {
+      margin-bottom: 7px;
+      padding: 0 2px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .carousel-head strong { color: #c59000; font-size: 12px; }
+    .carousel-head span { color: #858c96; font-size: 10px; font-weight: 850; }
+
+    .carousel-window {
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none;
+      touch-action: pan-y;
+      cursor: grab;
+    }
+
+    .carousel-window::-webkit-scrollbar { display: none; }
+    .carousel-window.dragging { cursor: grabbing; scroll-snap-type: none; }
+
+    .carousel-track {
+      display: flex;
+      gap: 10px;
+    }
+
+    .comment-card {
+      width: calc(100% - 40px);
+      min-width: calc(100% - 40px);
+      min-height: 106px;
+      padding: 10px;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+      scroll-snap-align: start;
+      border: 1px solid #edf0f4;
+      border-radius: 8px;
+      background: #f8f9fc;
+      box-shadow: 0 5px 12px rgba(24,29,37,.07);
+      cursor: pointer;
+    }
+
+    .comment-card.is-visible-last { margin-right: 40px; }
+    .comment-card[hidden] { display: none; }
+
+    .comment-user {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .comment-user img {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .comment-user strong { display: block; font-size: 12px; }
+    .comment-user small { display: block; color: #858c96; font-size: 10px; font-weight: 750; }
+    .comment-like { min-width: 62px; min-height: 30px; margin-left: 0; border-radius: 15px; font-size: 11px; }
+
+    .comment-card p {
+      margin: 0;
+      display: -webkit-box;
+      overflow: hidden;
+      color: #303640;
+      font-size: 12px;
+      line-height: 1.42;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .article-copy {
+      padding: 0 16px;
+      display: grid;
+      gap: 17px;
+      color: #3a3938;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 13px;
+      line-height: 1.56;
+    }
+
+    .article-copy p { margin: 0; }
+
+    .score-strip {
+      margin: 18px 0;
+      padding: 12px 18px 15px;
+      color: #fff;
+      background: #151387;
+    }
+
+    .score-top {
+      display: flex;
+      justify-content: space-between;
+      color: rgba(255,255,255,.84);
+      font-size: 10px;
+    }
+
+    .score-main {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .score-team {
+      display: grid;
+      justify-items: center;
+      gap: 5px;
+      font-size: 10px;
+    }
+
+    .score-team i {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #fff;
+      display: grid;
+      place-items: center;
+      font-style: normal;
+      font-size: 22px;
+    }
+
+    .score-number { font-size: 32px; line-height: 1; }
+
+    .topic-row,
+    .reaction-row {
+      padding: 0 14px;
+      display: flex;
+      gap: 7px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .topic-row { margin-top: 15px; }
+    .reaction-row { margin: 10px 0 14px; }
+
+    .topic-row span,
+    .reaction-row button {
+      min-height: 29px;
+      padding: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      flex: none;
+      border: 1px solid #e7e9ee;
+      border-radius: 15px;
+      background: #f7f8fa;
+      color: #5d626c;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .reaction-row button { min-height: 44px; cursor: pointer; }
+    .reaction-row button.selected { border-color: #ffc4c6; background: #fff0f1; color: var(--red); }
+
+    .comments-section {
+      padding: 15px 14px 24px;
+      border-top: 7px solid #f4f4f5;
+      scroll-margin-top: 10px;
+    }
+
+    .comments-screen .comments-section {
+      padding-top: 17px;
+      border-top: 0;
+    }
+
+    .comments-scroll { padding-bottom: 24px; }
+
+    .section-head {
+      margin-bottom: 13px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .section-head strong { font-size: 15px; }
+    .section-head span { color: #9297a0; font-size: 11px; }
+
+    .full-comment {
+      padding: 12px 0;
+      display: grid;
+      grid-template-columns: 32px 1fr;
+      gap: 9px;
+      border-bottom: 1px solid #eceef2;
+    }
+
+    .full-comment > img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .full-comment strong { font-size: 11px; }
+    .full-comment p { margin: 5px 0; color: #3a3f48; font-size: 12px; line-height: 1.42; }
+
+    .comment-actions {
+      display: flex;
+      gap: 14px;
+      color: #969ba4;
+      font-size: 10px;
+    }
+
+    .reply-preview {
+      margin-top: 9px;
+      padding: 8px;
+      border-radius: 6px;
+      background: #f5f6f8;
+      color: #626872;
+      font-size: 10px;
+      line-height: 1.45;
+    }
+
+    .related-news {
+      padding: 17px 14px 20px;
+      border-top: 7px solid #f4f4f5;
+    }
+
+    .related-news > h2 { margin: 0 0 6px; font-size: 16px; }
+
+    @media (max-width: 480px) {
+      body { background: #fff; }
+      .demo-shell {
+        min-height: 100dvh;
+        padding: 0;
+        gap: 0;
+      }
+
+      .demo-switcher {
+        width: 100%;
+        padding: 5px 12px;
+        border: 0;
+        border-bottom: 1px solid var(--line);
+        border-radius: 0;
+        background: #f8f9fb;
+        box-shadow: none;
+      }
+
+      .demo-switcher button { min-height: 47px; }
+
+      .app {
+        width: 100%;
+        height: calc(100dvh - 58px);
+        min-height: 640px;
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+      }
+
+      .demo-shell.no-switcher .app { height: 100dvh; }
+
+      .home-head { padding-top: env(safe-area-inset-top); height: calc(112px + env(safe-area-inset-top)); }
+      .detail-head { padding-top: env(safe-area-inset-top); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="demo-shell no-switcher" id="news-community-prototype" data-annotatable="true" aria-label="News community demo" tabindex="0">
+    <div class="app" id="news-community-app" data-annotatable="true" aria-label="News community demo" tabindex="0">
+    <section class="screen active" id="home-screen" data-annotatable="true" aria-label="News home" tabindex="0">
+      <header class="home-head" id="home-header" data-annotatable="true" aria-label="News 首页头部" tabindex="0">
+        <div class="status-bar"><span>09:34&nbsp; ◦</span><span class="signals">▮▮▮ <span class="battery"></span></span></div>
+        <div class="home-title" id="home-title" data-annotatable="true" aria-label="News" tabindex="0"><strong>News</strong><span class="profile-avatar" aria-label="Profile"></span></div>
+      </header>
+
+      <nav class="channel-tabs" id="home-channel-tabs" data-annotatable="true" aria-label="News channels" tabindex="0">
+        <button id="channel-fan-talk" data-annotatable="true" aria-label="Fan Talk 频道" tabindex="0" type="button" data-channel="talk">Fan Talk</button>
+        <button class="active" id="channel-today" data-annotatable="true" aria-label="Today 频道" tabindex="0" type="button" data-channel="today">Today</button>
+        <button id="channel-top-hits" data-annotatable="true" aria-label="Top Hits 频道" tabindex="0" type="button" data-channel="hits">Top Hits</button>
+        <button id="channel-premier-league" data-annotatable="true" aria-label="Premier League 频道" tabindex="0" type="button" data-channel="league">Premier League</button>
+        <button id="channel-la-liga" data-annotatable="true" aria-label="La Liga 频道" tabindex="0" type="button" data-channel="liga">La Liga</button>
+      </nav>
+
+      <div class="scroll-area home-feed" id="home-feed" data-annotatable="true" aria-label="新闻首页新闻列表" tabindex="0" data-home-scroll>
+        <button class="lead-story" id="home-lead-story" data-annotatable="true" aria-label="头图新闻：Brazil Advances to Last 32 as Vinicius Nets Twice" tabindex="0" type="button" data-open-article>
+          <img src="https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/article-hero.png" alt="Brazil player acknowledging supporters">
+          <span class="story-badge">WORLD CUP</span>
+          <span class="story-pages" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <span class="lead-copy"><h1>Brazil Advances to Last 32 as Vinicius Nets Twice</h1><small>4 hours ago</small></span>
+        </button>
+
+                  <article class="news-row" id="home-news-row-ochoa" data-annotatable="true" aria-label="Ochoa 新闻与精选评论" tabindex="0">
+                    <div><h2>Ochoa: Grateful for Support on My Journey</h2><div class="news-meta"><span>🇲🇽</span><span>Mexico · 1 hour ago</span><span class="comments-count">▢ 184</span></div></div>
+                    <div class="news-thumb"><img src="https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/news-thumb.png" alt="Player news thumbnail"></div>
+                    <div class="inline-comment" id="home-inline-comment-ochoa" data-annotatable="true" aria-label="Keeper Union 的新闻精选评论" role="button" tabindex="0" data-open-comments data-comment-story="ochoa">
+                      <i class="comment-avatar" data-annotatable="true" aria-label="Keeper Union 用户头像" role="img" style="background-image:url('https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/avatar-2.jpg')"></i>
+                      <div class="inline-comment-content" data-annotatable="true" aria-label="Keeper Union 新闻评论内容" tabindex="0"><div class="inline-comment-meta" data-annotatable="true" aria-label="Keeper Union 评论信息" tabindex="0"><span class="inline-comment-author"><strong>Keeper Union</strong><small>2 hours ago</small></span><span class="inline-like is-liked" data-like-status aria-label="当前用户已点赞，612 个赞"><span class="like-icon" aria-hidden="true">👍</span><span class="like-count">612</span></span></div><p>Conceding three does not mean he played badly. He saved two clear chances.</p></div>
+                    </div>
+                  </article>
+
+                  <article class="news-row" id="home-news-row-switzerland" data-annotatable="true" aria-label="Switzerland 新闻与精选评论" tabindex="0">
+                    <div><h2>Switzerland Top Group After 2-1 Victory</h2><div class="news-meta"><span>🏆</span><span>World Cup · 2 hours ago</span><span class="comments-count">▢ 96</span></div></div>
+                    <div class="news-thumb"><img src="https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/stadium.jpg" alt="Stadium at night"></div>
+                    <div class="inline-comment" id="home-inline-comment-switzerland" data-annotatable="true" aria-label="Alpine End 的新闻精选评论" role="button" tabindex="0" data-open-comments data-comment-story="switzerland">
+                      <i class="comment-avatar" data-annotatable="true" aria-label="Alpine End 用户头像" role="img" style="background-image:url('https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/avatar-3.jpg')"></i>
+                      <div class="inline-comment-content" data-annotatable="true" aria-label="Alpine End 新闻评论内容" tabindex="0"><div class="inline-comment-meta" data-annotatable="true" aria-label="Alpine End 评论信息" tabindex="0"><span class="inline-comment-author"><strong>Alpine End</strong><small>3 hours ago</small></span><span class="inline-like" data-like-status aria-label="当前用户未点赞，284 个赞"><span class="like-icon" aria-hidden="true">👍</span><span class="like-count">284</span></span></div><p>Mianzambi did more than score. His runs made Switzerland's attack flow.</p></div>
+                    </div>
+                  </article>
+
+                  <article class="news-row" id="home-news-row-klopp" data-annotatable="true" aria-label="Klopp 新闻" tabindex="0">
+                    <div><h2>Klopp on Future Coaching: “Let's Wait and See”</h2><div class="news-meta"><span>⚽</span><span>Premier League · 3 hours ago</span><span class="comments-count">▢ 42</span></div></div>
+                    <div class="news-thumb"><img src="https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/feature-player.png" alt="Football feature thumbnail"></div>
+                  </article>
+
+                  <section class="team-band" id="home-my-team" data-annotatable="true" aria-label="My Team" tabindex="0"><div><h2>⚽ My Team</h2><p>Real Madrid&nbsp; ♥</p></div><button type="button">More ›</button></section>
+      </div>
+
+      <nav class="bottom-nav" id="primary-navigation" data-annotatable="true" aria-label="Primary navigation" tabindex="0">
+        <button class="nav-item active" type="button"><b>▤</b><span>News</span></button>
+        <button class="nav-item" type="button"><b>⚽</b><span>Matches</span></button>
+        <button class="nav-item" type="button"><b>☆</b><span>Favorites</span></button>
+        <button class="nav-item" type="button"><b>♜</b><span>Leagues</span></button>
+      </nav>
+    </section>
+
+    <section class="screen" id="article-screen" data-annotatable="true" aria-label="News article" tabindex="0">
+      <header class="detail-head" id="article-header" data-annotatable="true" aria-label="新闻内页头部" tabindex="0">
+        <div class="status-bar"><span>09:34&nbsp; ◦</span><span class="signals">▮▮▮ <span class="battery"></span></span></div>
+        <div class="detail-toolbar"><button class="back-button" type="button" data-back aria-label="Back to news">‹</button></div>
+      </header>
+
+      <div class="scroll-area article-scroll" id="article-content-scroll" data-annotatable="true" aria-label="新闻内页内容" tabindex="0" data-article-scroll>
+        <article class="article-title" id="article-title" data-annotatable="true" aria-label="新闻标题" tabindex="0">
+          <h1 id="article-title-text">Brazil Advances to Last 32 as Vinicius Nets Twice</h1>
+          <div class="article-meta"><span id="article-published-at">◷ 4 hours ago</span><span id="article-view-count">◉ 12.4k views</span></div>
+        </article>
+
+        <div class="article-hero" id="article-hero" data-annotatable="true" aria-label="新闻头图" tabindex="0"><img id="article-hero-image" src="https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/article-hero.png" alt="Brazil player acknowledging supporters"></div>
+
+        <section class="comment-carousel" id="top-news-comments" data-annotatable="true" aria-label="Top news comments" tabindex="0">
+          <div class="carousel-head"><strong>Top news comments</strong><span data-carousel-count>1 / 3</span></div>
+          <div class="carousel-window" data-carousel>
+            <div class="carousel-track">
+              <article class="comment-card" id="top-comment-north-stand" data-annotatable="true" aria-label="North Stand 新闻热评" role="button" tabindex="0" data-open-full-comment>
+                <div class="comment-user" data-annotatable="true" aria-label="North Stand 评论用户信息" tabindex="0"><img src="https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/avatar-1.jpg" alt=""><div><strong>North Stand</strong><small>4 hours ago</small></div><span class="comment-like is-liked" data-like-status aria-label="当前用户已点赞，612 个赞"><span class="like-icon" aria-hidden="true">👍</span><span class="like-count">612</span></span></div>
+                <p>Brazil looked calm after the first goal. Scotland had moments, but the left side kept deciding the tempo.</p>
+              </article>
+              <article class="comment-card" id="top-comment-touchline-view" data-annotatable="true" aria-label="Touchline View 新闻热评" role="button" tabindex="0" data-open-full-comment>
+                <div class="comment-user" data-annotatable="true" aria-label="Touchline View 评论用户信息" tabindex="0"><img src="https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/avatar-2.jpg" alt=""><div><strong>Touchline View</strong><small>3 hours ago</small></div><span class="comment-like" data-like-status aria-label="当前用户未点赞，428 个赞"><span class="like-icon" aria-hidden="true">👍</span><span class="like-count">428</span></span></div>
+                <p>Vinicius pulled two defenders every time. That is why the scoreline felt controlled before it was finished.</p>
+              </article>
+              <article class="comment-card is-visible-last" id="top-comment-keeper-union" data-annotatable="true" aria-label="Keeper Union 新闻热评" role="button" tabindex="0" data-open-full-comment>
+                <div class="comment-user" data-annotatable="true" aria-label="Keeper Union 评论用户信息" tabindex="0"><img src="https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/avatar-3.jpg" alt=""><div><strong>Keeper Union</strong><small>2 hours ago</small></div><span class="comment-like" data-like-status aria-label="当前用户未点赞，391 个赞"><span class="like-icon" aria-hidden="true">👍</span><span class="like-count">391</span></span></div>
+                <p>Scotland conceded three, but the saves in the first half kept the match alive longer than the score suggests.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <div class="article-copy">
+          <p id="article-copy-one">Vinicius Jr scored twice as Brazil moved into the last 32 with a controlled win over Scotland. The match opened slowly, but Brazil's left side started to decide the rhythm after the first half-hour.</p>
+          <p id="article-copy-two">The first goal came from a quick switch of play, with Vinicius attacking the space before the Scottish back line could reset. From that point, every touch on the left side seemed to pull another defender toward him.</p>
+        </div>
+
+        <section class="score-strip" id="match-score" data-annotatable="true" aria-label="Brazil 3 Scotland 0, full time" tabindex="0">
+          <div class="score-top"><span>🏆 FIFA World Cup</span><span>Full Time</span></div>
+          <div class="score-main"><div class="score-team"><i>🇧🇷</i><span>Brazil</span></div><strong class="score-number">3 - 0</strong><div class="score-team"><i>🏴</i><span>Scotland</span></div></div>
+        </section>
+
+        <div class="article-copy">
+          <p id="article-copy-three">Scotland had chances after the break, especially from second balls around the box, but Brazil's forwards kept stretching the pitch. The second goal effectively settled the match and turned the final phase into a discussion about individual performances.</p>
+          <p id="article-copy-four">The result leaves Brazil in control of the group, while Scotland will need a response in the final round to keep their knockout hopes alive.</p>
+        </div>
+
+        <div class="topic-row" id="article-topics" aria-label="Related topics"><span>🇧🇷 Brazil</span><span>🏴 Scotland</span><span>🏆 World Cup</span><span>⚽ Vinicius Jr</span></div>
+        <div class="reaction-row" aria-label="Article reactions"><button type="button">👍 612</button><button type="button">🔥 428</button><button type="button">👏 284</button><button type="button">🤔 96</button></div>
+
+        <section class="comments-section" id="article-news-comments" data-annotatable="true" aria-label="新闻内页 News comments 评论区" tabindex="0">
+          <div class="section-head" id="article-news-comments-header" data-annotatable="true" aria-label="新闻内页评论区标题" tabindex="0"><strong>News comments</strong><span id="article-comments-count-label">3.1k</span></div>
+          <div class="comments-list" id="article-comments-list" data-annotatable="true" aria-label="新闻内页完整评论列表" tabindex="0"></div>
+        </section>
+
+        <section class="related-news" id="related-news" data-annotatable="true" aria-label="Related news" tabindex="0">
+          <h2>Related news</h2>
+          <article class="news-row"><div><h2>Brazil prepare for their final group match</h2><div class="news-meta"><span>🏆</span><span>World Cup · 1 hour ago</span><span class="comments-count">▢ 68</span></div></div><div class="news-thumb"><img src="https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/article-hero.png" alt="Related match report"></div></article>
+          <article class="news-row"><div><h2>Olise tops the fan ratings after France win</h2><div class="news-meta"><span>🇫🇷</span><span>France · 2 hours ago</span><span class="comments-count">▢ 154</span></div></div><div class="news-thumb"><img src="https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/news-thumb.png" alt="Related player report"></div></article>
+        </section>
+      </div>
+    </section>
+
+    <section class="screen comments-screen" id="comments-screen" data-annotatable="true" aria-label="News comments 评论区页面" tabindex="0">
+      <header class="detail-head" id="comments-header" data-annotatable="true" aria-label="News comments 页面头部" tabindex="0">
+        <div class="status-bar"><span>09:34&nbsp; ◦</span><span class="signals">▮▮▮ <span class="battery"></span></span></div>
+        <div class="detail-toolbar"><button class="back-button" type="button" data-comments-back aria-label="返回上一个页面">‹</button></div>
+        <div class="comments-page-title" id="comments-page-title" data-annotatable="true" aria-label="News comments 新闻评论区标题" tabindex="0"><h1>News comments</h1><p id="comments-page-meta">Brazil 3 - 0 Scotland · Full time</p></div>
+      </header>
+      <div class="scroll-area comments-scroll" id="comments-content-scroll" data-annotatable="true" data-comments-scroll aria-label="News comments 评论列表" tabindex="0">
+        <section class="comments-section" id="news-comments" data-annotatable="true" aria-label="News comments 完整评论区" tabindex="0">
+          <div class="section-head" id="news-comments-header" data-annotatable="true" aria-label="News comments 标题" tabindex="0"><strong id="comments-count-label">3.1k comments</strong><span>Sort by heat</span></div>
+          <div class="comments-list" id="comments-list" data-annotatable="true" aria-label="完整评论列表" tabindex="0"></div>
+        </section>
+      </div>
+    </section>
+    </div>
+  </main>
+
+  <script>
+    const homeScreen = document.getElementById('home-screen');
+    const articleScreen = document.getElementById('article-screen');
+    const commentsScreen = document.getElementById('comments-screen');
+    const homeScroll = document.querySelector('[data-home-scroll]');
+    const articleScroll = document.querySelector('[data-article-scroll]');
+    const commentsScroll = document.querySelector('[data-comments-scroll]');
+    const commentsPageMeta = document.getElementById('comments-page-meta');
+    const commentsCountLabel = document.getElementById('comments-count-label');
+    const commentsList = document.getElementById('comments-list');
+    const articleTitleText = document.getElementById('article-title-text');
+    const articlePublishedAt = document.getElementById('article-published-at');
+    const articleViewCount = document.getElementById('article-view-count');
+    const articleHeroImage = document.getElementById('article-hero-image');
+    const articleCopy = [
+      document.getElementById('article-copy-one'),
+      document.getElementById('article-copy-two'),
+      document.getElementById('article-copy-three'),
+      document.getElementById('article-copy-four')
+    ];
+    const matchScore = document.getElementById('match-score');
+    const articleTopics = document.getElementById('article-topics');
+    const articleCommentsSection = document.getElementById('article-news-comments');
+    const articleCommentsCountLabel = document.getElementById('article-comments-count-label');
+    const articleCommentsList = document.getElementById('article-comments-list');
+    const demoTabs = Array.from(document.querySelectorAll('[data-demo-screen]'));
+    let commentsReturnScreen = 'article';
+    let commentsReturnStory = 'article';
+    let activeArticleStory = 'article';
+    const commentStories = {
+      article: {
+        title: 'Brazil Advances to Last 32 as Vinicius Nets Twice',
+        publishedAt: '4 hours ago',
+        viewCount: '12.4k views',
+        hero: 'https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/article-hero.png',
+        heroAlt: 'Brazil player acknowledging supporters',
+        copy: [
+          "Vinicius Jr scored twice as Brazil moved into the last 32 with a controlled win over Scotland. The match opened slowly, but Brazil's left side started to decide the rhythm after the first half-hour.",
+          'The first goal came from a quick switch of play, with Vinicius attacking the space before the Scottish back line could reset. From that point, every touch on the left side seemed to pull another defender toward him.',
+          "Scotland had chances after the break, especially from second balls around the box, but Brazil's forwards kept stretching the pitch. The second goal effectively settled the match and turned the final phase into a discussion about individual performances.",
+          'The result leaves Brazil in control of the group, while Scotland will need a response in the final round to keep their knockout hopes alive.'
+        ],
+        topics: ['🇧🇷 Brazil', '🏴 Scotland', '🏆 World Cup', '⚽ Vinicius Jr'],
+        showScore: true,
+        context: 'Brazil 3 - 0 Scotland · Full time',
+        count: '3.1k comments',
+        comments: [
+          { id: 'full-comment-north-stand', user: 'North Stand', avatar: 'https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/avatar-1.jpg', time: '4 hours ago', likes: '612', viewerLiked: true, badge: '🔥', text: 'Brazil looked calm after the first goal. Scotland had moments, but the left side kept deciding the tempo.', replies: [['Touchline View:', 'The left side made every attack feel dangerous.'], ['Blue Line:', "Scotland's shape kept narrowing too early."]] },
+          { id: 'full-comment-touchline-view', user: 'Touchline View', avatar: 'https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/avatar-2.jpg', time: '3 hours ago', likes: '428', viewerLiked: false, badge: '🔥', text: 'Vinicius pulled two defenders every time. That is why the scoreline felt controlled before it was finished.' },
+          { id: 'full-comment-keeper-union', user: 'Keeper Union', avatar: 'https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/avatar-3.jpg', time: '2 hours ago', likes: '391', viewerLiked: false, text: 'Scotland conceded three, but the saves in the first half kept the match alive longer than the score suggests.' }
+        ]
+      },
+      ochoa: {
+        title: 'Ochoa: Grateful for Support on My Journey',
+        publishedAt: '1 hour ago',
+        viewCount: '8.3k views',
+        hero: 'https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/news-thumb.png',
+        heroAlt: 'Ochoa acknowledging supporters',
+        copy: [
+          'Guillermo Ochoa thanked supporters for staying with him throughout a career shaped by major tournaments, difficult nights and memorable saves.',
+          'The Mexico goalkeeper said the messages he receives after matches still matter, especially when the scoreline does not tell the full story of his performance.',
+          'He also reflected on the responsibility that comes with representing Mexico and the value of keeping perspective during criticism.',
+          'Supporters responded by sharing the moments that made his international journey memorable to them.'
+        ],
+        topics: ['🇲🇽 Mexico', '🧤 Guillermo Ochoa', '⚽ Goalkeepers'],
+        showScore: false,
+        context: 'Mexico · 1 hour ago',
+        count: '184 comments',
+        comments: [
+          { id: 'full-comment-keeper-union', user: 'Keeper Union', avatar: 'https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/avatar-2.jpg', time: '2 hours ago', likes: '612', viewerLiked: true, text: 'Conceding three does not mean he played badly. He saved two clear chances.' },
+          { id: 'full-comment-low-block-club', user: 'Low Block Club', avatar: 'https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/avatar-1.jpg', time: '3 hours ago', likes: '184', viewerLiked: false, text: "Ochoa's first-half saves kept the match alive longer than the score suggests." }
+        ]
+      },
+      switzerland: {
+        title: 'Switzerland Top Group After 2-1 Victory',
+        publishedAt: '2 hours ago',
+        viewCount: '6.8k views',
+        hero: 'https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/stadium.jpg',
+        heroAlt: 'World Cup stadium at night',
+        copy: [
+          'Switzerland moved to the top of the group with a composed 2-1 victory built on patient possession and well-timed runs through the middle.',
+          'Mianzambi supplied the decisive moment, but the movement around him repeatedly opened the space that Switzerland needed in the final third.',
+          'The closing stages demanded discipline as their opponents pushed more players forward in search of an equaliser.',
+          'Switzerland held their shape and protected the lead to put qualification in their own hands.'
+        ],
+        topics: ['🇨🇭 Switzerland', '🏆 World Cup', '⚽ Mianzambi'],
+        showScore: false,
+        context: 'World Cup · 2 hours ago',
+        count: '96 comments',
+        comments: [
+          { id: 'full-comment-alpine-end', user: 'Alpine End', avatar: 'https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/avatar-3.jpg', time: '3 hours ago', likes: '284', viewerLiked: false, text: "Mianzambi did more than score. His runs made Switzerland's attack flow." },
+          { id: 'full-comment-north-stand', user: 'North Stand', avatar: 'https://raw.githubusercontent.com/1205680593-droid/news-community-demo/main/assets/avatar-1.jpg', time: '4 hours ago', likes: '176', viewerLiked: true, text: 'The winning goal came from patience, not a rushed final pass.' }
+        ]
+      }
+    };
+
+    function createCommentElement(comment, idPrefix = '') {
+      const article = document.createElement('article');
+      article.className = 'full-comment';
+      article.id = `${idPrefix}${comment.id}`;
+      article.dataset.annotatable = 'true';
+      article.setAttribute('aria-label', `${comment.user} 完整评论`);
+      article.tabIndex = 0;
+
+      const avatar = document.createElement('img');
+      avatar.src = comment.avatar;
+      avatar.alt = `${comment.user} 用户头像`;
+      const body = document.createElement('div');
+      const author = document.createElement('strong');
+      author.textContent = comment.badge ? `${comment.user}  ${comment.badge}` : comment.user;
+      const text = document.createElement('p');
+      text.textContent = comment.text;
+      const actions = document.createElement('div');
+      actions.className = 'comment-actions';
+      [comment.time, `👍 ${comment.likes}`, 'Reply'].forEach((value) => {
+        const item = document.createElement('span');
+        item.textContent = value;
+        actions.append(item);
+      });
+      body.append(author, text, actions);
+      if (comment.replies) {
+        const replies = document.createElement('div');
+        replies.className = 'reply-preview';
+        comment.replies.forEach(([name, reply], index) => {
+          const label = document.createElement('b');
+          label.textContent = name;
+          replies.append(label, ` ${reply}`);
+          if (index < comment.replies.length - 1) replies.append(document.createElement('br'));
+        });
+        body.append(replies);
+      }
+      article.append(avatar, body);
+      return article;
+    }
+
+    function renderCommentList(container, comments, idPrefix = '') {
+      container.replaceChildren(...comments.map((comment) => createCommentElement(comment, idPrefix)));
+    }
+
+    function renderComments(storyId = 'article') {
+      const story = commentStories[storyId] || commentStories.article;
+      commentsPageMeta.textContent = story.context;
+      commentsCountLabel.textContent = story.count;
+      renderCommentList(commentsList, story.comments);
+    }
+
+    function renderArticle(storyId = 'article') {
+      activeArticleStory = commentStories[storyId] ? storyId : 'article';
+      const story = commentStories[activeArticleStory];
+      articleTitleText.textContent = story.title;
+      articlePublishedAt.textContent = `◷ ${story.publishedAt}`;
+      articleViewCount.textContent = `◉ ${story.viewCount}`;
+      articleHeroImage.src = story.hero;
+      articleHeroImage.alt = story.heroAlt;
+      articleCopy.forEach((paragraph, index) => { paragraph.textContent = story.copy[index]; });
+      matchScore.hidden = !story.showScore;
+      articleTopics.replaceChildren(...story.topics.map((topic) => {
+        const item = document.createElement('span');
+        item.textContent = topic;
+        return item;
+      }));
+      articleCommentsCountLabel.textContent = story.count.replace(' comments', '');
+      renderCommentList(articleCommentsList, story.comments, 'article-');
+
+      const visibleComments = story.comments.slice(0, cards.length);
+      cards.forEach((card, index) => {
+        const comment = visibleComments[index];
+        card.hidden = !comment;
+        card.classList.toggle('is-visible-last', index === visibleComments.length - 1);
+        if (!comment) return;
+        card.setAttribute('aria-label', `${comment.user} 新闻热评`);
+        card.querySelector('img').src = comment.avatar;
+        card.querySelector('img').alt = `${comment.user} 用户头像`;
+        card.querySelector('strong').textContent = comment.user;
+        card.querySelector('small').textContent = comment.time;
+        const likeStatus = card.querySelector('[data-like-status]');
+        likeStatus.classList.toggle('is-liked', comment.viewerLiked === true);
+        likeStatus.querySelector('.like-count').textContent = comment.likes;
+        likeStatus.setAttribute('aria-label', `当前用户${comment.viewerLiked ? '已' : '未'}点赞，${comment.likes} 个赞`);
+        card.querySelector('p').textContent = comment.text;
+      });
+      carousel.scrollLeft = 0;
+      updateCarouselCount();
+    }
+
+    function announceView(screen, details = {}) {
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'news-community-demo:view', screen, ...details }, '*');
+      }
+    }
+
+    function syncDemoTab(screen) {
+      demoTabs.forEach((tab) => {
+        const active = tab.dataset.demoScreen === screen;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', String(active));
+      });
+    }
+
+    function showArticle(storyId = 'article', targetComments = false, notifyParent = true) {
+      renderArticle(storyId);
+      homeScreen.classList.remove('active');
+      commentsScreen.classList.remove('active');
+      articleScreen.classList.add('active');
+      resetCarouselAutoplay();
+      syncDemoTab('article');
+      articleScroll.scrollTop = 0;
+      if (targetComments) {
+        requestAnimationFrame(() => {
+          articleScroll.scrollTop = Math.max(0, articleCommentsSection.offsetTop - 8);
+        });
+      }
+      if (notifyParent) announceView('article', { storyId: activeArticleStory, targetComments });
+    }
+
+    function showHome(notifyParent = true) {
+      clearCarouselAutoplay();
+      articleScreen.classList.remove('active');
+      commentsScreen.classList.remove('active');
+      homeScreen.classList.add('active');
+      syncDemoTab('home');
+      homeScroll.scrollTop = 0;
+      if (notifyParent) announceView('home');
+    }
+
+    function showComments(returnScreen = 'home', storyId = 'article', notifyParent = true) {
+      clearCarouselAutoplay();
+      commentsReturnScreen = returnScreen === 'article' ? 'article' : 'home';
+      commentsReturnStory = storyId;
+      homeScreen.classList.remove('active');
+      articleScreen.classList.remove('active');
+      commentsScreen.classList.add('active');
+      renderComments(storyId);
+      commentsScroll.scrollTop = 0;
+      if (notifyParent) announceView('comments');
+    }
+
+    function returnFromComments() {
+      if (commentsReturnScreen === 'article') showArticle(commentsReturnStory);
+      else showHome();
+    }
+
+    demoTabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        if (tab.dataset.demoScreen === 'article') showArticle('article');
+        else showHome();
+      });
+    });
+
+    window.addEventListener('message', (event) => {
+      if (event.data?.type !== 'news-community-demo:set-view') return;
+      if (event.data.screen === 'article') showArticle(event.data.storyId || 'article', Boolean(event.data.targetComments), false);
+      if (event.data.screen === 'home') showHome(false);
+    });
+
+    document.querySelector('[data-open-article]').addEventListener('click', () => showArticle('article'));
+    document.querySelectorAll('[data-open-comments]').forEach((comment) => {
+      comment.addEventListener('click', (event) => {
+        showArticle(comment.dataset.commentStory, true);
+      });
+      comment.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        showArticle(comment.dataset.commentStory, true);
+      });
+    });
+    document.querySelector('[data-back]').addEventListener('click', showHome);
+    document.querySelector('[data-comments-back]').addEventListener('click', returnFromComments);
+
+    document.querySelectorAll('[data-channel]').forEach((button) => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('[data-channel]').forEach((item) => item.classList.toggle('active', item === button));
+      });
+    });
+
+    document.querySelectorAll('.reaction-row button').forEach((button) => {
+      button.addEventListener('click', () => button.classList.toggle('selected'));
+    });
+
+    const carousel = document.querySelector('[data-carousel]');
+    const cards = Array.from(carousel.querySelectorAll('.comment-card'));
+    const carouselCount = document.querySelector('[data-carousel-count]');
+    let dragStartX = 0;
+    let dragStartScroll = 0;
+    let dragPointer = null;
+    let dragMoved = false;
+    let carouselTimer = null;
+    const carouselInterval = 5000;
+
+    function openFullComments() {
+      showComments('article', activeArticleStory);
+    }
+
+    cards.forEach((card) => {
+      card.addEventListener('click', (event) => {
+        if (dragMoved) {
+          dragMoved = false;
+          event.preventDefault();
+          return;
+        }
+        openFullComments();
+      });
+      card.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        openFullComments();
+      });
+    });
+
+    function visibleCarouselCards() {
+      return cards.filter((card) => !card.hidden);
+    }
+
+    function activeCarouselIndex() {
+      const visibleCards = visibleCarouselCards();
+      if (visibleCards.length < 2) return 0;
+      const firstOffset = visibleCards[0].offsetLeft;
+      return visibleCards.reduce((nearestIndex, card, index) => {
+        const currentDistance = Math.abs(carousel.scrollLeft - (card.offsetLeft - firstOffset));
+        const nearestDistance = Math.abs(carousel.scrollLeft - (visibleCards[nearestIndex].offsetLeft - firstOffset));
+        return currentDistance < nearestDistance ? index : nearestIndex;
+      }, 0);
+    }
+
+    function updateCarouselCount() {
+      const visibleCards = visibleCarouselCards();
+      carouselCount.textContent = `${visibleCards.length ? activeCarouselIndex() + 1 : 0} / ${visibleCards.length}`;
+    }
+
+    function scrollToCarouselCard(index, behavior = 'smooth') {
+      const visibleCards = visibleCarouselCards();
+      const target = visibleCards[index];
+      if (!target || !visibleCards[0]) return;
+      carousel.scrollTo({ left: target.offsetLeft - visibleCards[0].offsetLeft, behavior });
+    }
+
+    function snapCarousel() {
+      scrollToCarouselCard(activeCarouselIndex());
+    }
+
+    function clearCarouselAutoplay() {
+      window.clearTimeout(carouselTimer);
+      carouselTimer = null;
+    }
+
+    function carouselCanAutoplay() {
+      return visibleCarouselCards().length > 1
+        && articleScreen.classList.contains('active')
+        && !document.hidden
+        && dragPointer === null
+        && !carousel.querySelector(':focus-visible');
+    }
+
+    function resetCarouselAutoplay() {
+      clearCarouselAutoplay();
+      if (!carouselCanAutoplay()) return;
+      carouselTimer = window.setTimeout(() => {
+        carouselTimer = null;
+        if (!carouselCanAutoplay()) return;
+        const visibleCards = visibleCarouselCards();
+        const nextIndex = (activeCarouselIndex() + 1) % visibleCards.length;
+        scrollToCarouselCard(nextIndex);
+        resetCarouselAutoplay();
+      }, carouselInterval);
+    }
+
+    carousel.addEventListener('scroll', updateCarouselCount, { passive: true });
+    carousel.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      dragPointer = event.pointerId;
+      dragStartX = event.clientX;
+      dragStartScroll = carousel.scrollLeft;
+      dragMoved = false;
+      clearCarouselAutoplay();
+    });
+
+    carousel.addEventListener('pointermove', (event) => {
+      if (event.pointerId !== dragPointer) return;
+      if (!dragMoved && Math.abs(event.clientX - dragStartX) > 8) {
+        dragMoved = true;
+        carousel.classList.add('dragging');
+        carousel.setPointerCapture?.(event.pointerId);
+      }
+      if (!dragMoved) return;
+      carousel.scrollLeft = dragStartScroll - (event.clientX - dragStartX);
+    });
+
+    carousel.addEventListener('pointerup', (event) => {
+      if (event.pointerId !== dragPointer) return;
+      dragPointer = null;
+      carousel.classList.remove('dragging');
+      if (dragMoved) snapCarousel();
+      resetCarouselAutoplay();
+    });
+
+    carousel.addEventListener('pointercancel', () => {
+      dragPointer = null;
+      dragMoved = false;
+      carousel.classList.remove('dragging');
+      snapCarousel();
+      resetCarouselAutoplay();
+    });
+
+    carousel.addEventListener('focusin', clearCarouselAutoplay);
+    carousel.addEventListener('focusout', () => window.setTimeout(resetCarouselAutoplay, 0));
+    document.addEventListener('visibilitychange', resetCarouselAutoplay);
+    window.addEventListener('resize', () => {
+      snapCarousel();
+      resetCarouselAutoplay();
+    });
+
+    const initialView = new URLSearchParams(window.location.search).get('screen');
+    const initialCommentsSource = new URLSearchParams(window.location.search).get('from');
+    const initialStory = new URLSearchParams(window.location.search).get('story') || 'article';
+    renderComments('article');
+    renderArticle('article');
+    if (initialView === 'article') showArticle(initialStory, false, false);
+    if (initialView === 'comments') showComments(initialCommentsSource, 'article', false);
+  </script>
+</body>
+</html>
