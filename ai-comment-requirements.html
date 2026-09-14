@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>AI 评论互动生成逻辑</title>
+  <style>
+    :root {
+      --page:#edf3f7; --surface:#fff; --proto:#e7eef3; --ink:#17263b; --text:#46576c;
+      --muted:#718096; --line:#d5e0ea; --navy:#17263b; --green-bg:#eef9f3;
+      --green-line:#b9dfca; --green:#23633f; --amber-bg:#fff8e9; --amber-line:#efd18c;
+      --red:#d8273f; --product:#17191e;
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;
+      color:var(--ink); background:var(--page);
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; }
+    button,input { font:inherit; }
+    button { cursor:pointer; }
+    .document { width:min(1180px,calc(100% - 24px)); margin:20px auto 48px; }
+    .document-title { margin:0 0 12px; color:var(--muted); font-size:15px; }
+    .module { overflow:hidden; margin-bottom:16px; background:var(--surface); border:1px solid var(--line); border-radius:8px; }
+    .module-head { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--line); }
+    .module-number { display:grid; place-items:center; width:40px; height:40px; flex:0 0 40px; color:#fff; background:var(--navy); border-radius:7px; font-weight:800; }
+    .module-head h1 { margin:0; font-size:20px; line-height:1.25; letter-spacing:0; }
+    .module-head p { margin:3px 0 0; color:var(--muted); font-size:12px; font-weight:700; }
+    .module-body { display:grid; grid-template-columns:minmax(390px,46%) minmax(0,54%); }
+    .prototype { padding:16px; background:var(--proto); border-right:1px solid var(--line); }
+    .prototype-inner { width:min(100%,420px); margin:0 auto; }
+    .control { margin-bottom:10px; padding:10px; background:#fff; border:1px solid #cfd9e2; border-radius:8px; }
+    .control-top { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .control-top span { color:var(--muted); font-size:11px; }
+    .control-top strong { display:block; margin-top:2px; font-size:15px; }
+    .control input { width:100%; height:44px; margin:2px 0 0; accent-color:var(--red); }
+    .presets { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; overflow:hidden; border:1px solid #d8e0e7; border-radius:6px; }
+    .presets button { min-width:0; min-height:40px; padding:0 4px; color:#5c6876; background:#fff; border:0; border-right:1px solid #d8e0e7; font-size:11px; }
+    .presets button:last-child { border-right:0; }
+    .presets button.active { color:#fff; background:var(--navy); }
+    .phone-panel { overflow:hidden; background:#fff; border:1px solid #cbd5df; border-radius:8px; box-shadow:0 6px 14px rgba(27,41,56,.08); }
+    .news-strip { display:grid; grid-template-columns:92px 1fr; gap:10px; padding:10px; border-bottom:1px solid #eceff2; }
+    .news-strip img { width:92px; height:72px; object-fit:cover; border-radius:5px; }
+    .news-strip h2 { margin:2px 0 6px; color:var(--product); font-size:14px; line-height:1.35; }
+    .news-strip p { margin:0; color:#8a929b; font-size:11px; }
+    .comment { display:grid; grid-template-columns:34px 1fr; gap:9px; padding:14px; }
+    .avatar { display:grid; place-items:center; width:34px; height:34px; color:#fff; background:#3f6d8e; border-radius:50%; font-size:12px; font-weight:800; }
+    .avatar.reply { width:28px; height:28px; background:#8d594c; font-size:10px; }
+    .author { display:flex; align-items:center; gap:6px; color:#4c5663; font-size:12px; font-weight:700; }
+    .ai { padding:1px 5px; color:#8a2635; background:#fff0f2; border:1px solid #f0bbc3; border-radius:4px; font-size:9px; }
+    .comment-text { margin:5px 0 6px; color:var(--product); font-size:14px; line-height:1.48; }
+    .meta { display:flex; align-items:center; gap:12px; min-height:30px; color:#929aa4; font-size:11px; }
+    .likes { color:var(--red); font-weight:700; font-variant-numeric:tabular-nums; }
+    .target-note { padding:9px 14px; color:#657282; background:#f7f8fa; border-top:1px solid #eceff2; font-size:11px; }
+    .reply-demo { padding:4px 14px 10px; }
+    .parent-summary { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eceff2; font-size:12px; }
+    .parent-summary strong { font-size:14px; }
+    .reply-like-row { display:grid; grid-template-columns:28px 1fr auto; gap:9px; align-items:start; padding:11px 0; border-bottom:1px solid #eceff2; }
+    .reply-like-row:last-child { border-bottom:0; }
+    .reply-like-row p { margin:3px 0 0; color:var(--product); font-size:12px; line-height:1.42; }
+    .reply-count { min-width:46px; padding-top:4px; text-align:right; }
+    .reply-count strong { display:block; color:var(--red); font-size:15px; }
+    .reply-count span { color:#89939e; font-size:10px; }
+    .schedule-tools { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+    .icon-button { display:grid; place-items:center; width:44px; height:44px; flex:0 0 44px; color:#fff; background:var(--navy); border:0; border-radius:6px; }
+    .schedule-status { min-width:0; flex:1; }
+    .schedule-status span { color:var(--muted); font-size:11px; }
+    .schedule-status strong { display:block; margin-top:2px; font-size:15px; }
+    .schedule-list { min-height:220px; padding:8px 14px 12px; }
+    .schedule-empty { margin:80px 0 0; color:#949da7; text-align:center; font-size:12px; }
+    .scheduled-reply { display:grid; grid-template-columns:28px 1fr; gap:9px; padding:10px 0; border-bottom:1px solid #eceff2; }
+    .scheduled-reply:last-child { border-bottom:0; }
+    .scheduled-reply p { margin:3px 0 2px; color:var(--product); font-size:12px; line-height:1.42; }
+    .scheduled-reply time { color:#929aa4; font-size:10px; }
+    .specification { display:grid; align-content:start; gap:12px; padding:16px; }
+    .rule { padding:13px 14px; background:#f9fbfc; border:1px solid var(--line); border-radius:8px; }
+    .rule.calc { background:var(--green-bg); border-color:var(--green-line); }
+    .rule.edge { background:var(--amber-bg); border-color:var(--amber-line); }
+    .rule h2 { margin:0 0 7px; font-size:14px; }
+    .rule ul { margin:0; padding-left:18px; color:var(--text); font-size:13px; line-height:1.65; }
+    .rule li+li { margin-top:4px; }
+    .rule code { padding:1px 4px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:11px; background:rgba(255,255,255,.7); border-radius:3px; }
+    .example { color:var(--text); font-size:13px; line-height:1.65; }
+    .example strong { color:var(--ink); }
+    .schedule-table { width:100%; border-collapse:collapse; color:var(--text); font-size:12px; }
+    .schedule-table th,.schedule-table td { padding:8px 6px; border-bottom:1px solid #dbe8df; text-align:left; }
+    .schedule-table th { color:var(--green); font-weight:800; }
+    @media(max-width:800px) {
+      .document { width:min(100% - 16px,1180px); margin-top:8px; }
+      .module-body { grid-template-columns:1fr; }
+      .prototype { border-right:0; border-bottom:1px solid var(--line); }
+    }
+    @media(max-width:420px) {
+      .document { width:100%; margin:0; }
+      .document-title { padding:10px 10px 0; }
+      .module { border-right:0; border-left:0; border-radius:0; }
+      .module-head,.prototype,.specification { padding:10px; }
+      .module-head h1 { font-size:18px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="document">
+    <p class="document-title">AI 评论互动生成逻辑 · 简版</p>
+
+    <section class="module" id="comment-likes-module">
+      <header class="module-head">
+        <span class="module-number">1</span>
+        <div><h1>Machine Comment Likes</h1><p>机器评论点赞数怎么随时间增长</p></div>
+      </header>
+      <div class="module-body">
+        <div class="prototype">
+          <div class="prototype-inner">
+            <div class="control">
+              <div class="control-top"><div><span>评论发布后</span><strong id="commentTimeLabel">0 分钟</strong></div><div><span>2小时目标</span><strong>386 赞</strong></div></div>
+              <input id="commentTime" type="range" min="0" max="120" step="1" value="0" aria-label="调整机器评论发布时间">
+              <div class="presets" data-control="comment"><button type="button" data-value="0" class="active">0分</button><button type="button" data-value="30">30分</button><button type="button" data-value="60">1小时</button><button type="button" data-value="90">1.5小时</button><button type="button" data-value="120">2小时</button></div>
+            </div>
+            <div class="phone-panel">
+              <div class="news-strip"><img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAASABIAAD/4QCARXhpZgAATU0AKgAAAAgABAEaAAUAAAABAAAAPgEbAAUAAAABAAAARgEoAAMAAAABAAIAAIdpAAQAAAABAAAATgAAAAAAAABIAAAAAQAAAEgAAAABAAOgAQADAAAAAQABAACgAgAEAAAAAQAAAKWgAwAEAAAAAQAAANwAAAAA/+0AOFBob3Rvc2hvcCAzLjAAOEJJTQQEAAAAAAAAOEJJTQQlAAAAAAAQ1B2M2Y8AsgTpgAmY7PhCfv/CABEIANwApQMBIgACEQEDEQH/xAAfAAABBQEBAQEBAQAAAAAAAAADAgQBBQAGBwgJCgv/xADDEAABAwMCBAMEBgQHBgQIBnMBAgADEQQSIQUxEyIQBkFRMhRhcSMHgSCRQhWhUjOxJGIwFsFy0UOSNIII4VNAJWMXNfCTc6JQRLKD8SZUNmSUdMJg0oSjGHDiJ0U3ZbNVdaSVw4Xy00Z2gONHVma0CQoZGigpKjg5OkhJSldYWVpnaGlqd3h5eoaHiImKkJaXmJmaoKWmp6ipqrC1tre4ubrAxMXGx8jJytDU1dbX2Nna4OTl5ufo6erz9PX29/j5+v/EAB8BAAMBAQEBAQEBAQEAAAAAAAECAAMEBQYHCAkKC//EAMMRAAICAQMDAwIDBQIFAgQEhwEAAhEDEBIhBCAxQRMFMCIyURRABjMjYUIVcVI0gVAkkaFDsRYHYjVT8NElYMFE4XLxF4JjNnAmRVSSJ6LSCAkKGBkaKCkqNzg5OkZHSElKVVZXWFlaZGVmZ2hpanN0dXZ3eHl6gIOEhYaHiImKkJOUlZaXmJmaoKOkpaanqKmqsLKztLW2t7i5usDCw8TFxsfIycrQ09TV1tfY2drg4uPk5ebn6Onq8vP09fb3+Pn6/9sAQwAMDAwMDAwUDAwUHRQUFB0nHR0dHScxJycnJycxOzExMTExMTs7Ozs7Ozs7R0dHR0dHU1NTU1NdXV1dXV1dXV1d/9sAQwEODw8YFhgoFhYoYUI2QmFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFh/9oADAMBAAIRAxEAAAHEHmSH1e9BcLCSNBQ9XygO0TWKJcHMtMJxgrgSY1Lcs3k12thLrUzXqE/KzirFdVIrCketIpytSVwQwVKKCJeUClewpK3MQpMpZWaiKpc4sG2ekjWFsEstXLnMgFxqfODEV+ehaM9lDf2JXny3LcqxhxiGMyoFK9NLILUa0qLsimfNriWp1zXMFtyy6VIH7Dn6ru6rbeVjS3fMsFYE0GRyCXD1GkM1YvGg6g7WSl2Tn3aaPQgCy3NUl+yhf8+BXvKcaaJIdSJ2qdprKxadurV8G5qo7vmRVEvHZqdw4UUaiVAKgrQbaJpe2oOlVJlU0TuWzqL0NcUFjLwMMWFCZCcxBFDejZebh61JGkianTqFLqVLW0bOCLSnawR0b2sdo7sEKNkkkUyFUQmQsFXHdzzjJUZ26FU64wLklarM2lDZUrqN6xudAV8nKx0iJS8NNHUKKcQFYJBaARqVsGjC1V+SfRB0d/SuHllT2zzjNyAN3QNRFiJWKx0z6W8icJYu1Z2sQMGVA5IYuWKnVy1ckNS2LMmgdqaoZXQEBi5WwXCdXLqx1ZMXPRUfQZNIUxmXOQGq0jE+ingMUZqcRkY42CEmHSYKKm0KhxE7U5c1uU20MCrO4FAIVtlMDJTIiGAUEa0jg5ApdJTMGQ2fN2g6MRtoohG+i6zXCUsZjRkQJ2EUU4SPUcjeRFyYrRGpAyoaToxpjattq//aAAgBAQABBQIBnsO98jq+4nj9+Nh1ZLBYLq8nd9UP3aurq6uvdD5j5j5jzfMfNfNa5Ko+55d6dqdgz3H3AXR0dHRgFkMJ+5k6sM9x90/cDCGU6Hj2oXQsdqfcoHiHgGtCQ8XiyKdkqBCuCuLjTV8p8tlLp9yryeb5jwUofmEGSaFD5aS6ApyJa+1uHRra1PL7tHRpGqz0w0z1ehZjCWCCympnCgXb8HJwXxdXV1dXV1cXFag0PSoKI01yChUhdHkCJbcoca6PnBrlZOv30aBYOSahlVWOPMqVKq8gGFFDTMmiuk1Lr/M+QjkVHJFIhFVUIo/ZeTTkWahpVqr+aSkqMVo1W6azroFmUgQKIEOIkiKVCOQJIUxRn+ZQhS1QQJhDURSbOgToA6AuVKaRpVzJEoLliMf81bQiBCpQ5ZExjRPYkJ7qiClx5pilryoRzHLEYlfftYwuSW5D4laxVXstaBIMdaDLIAkVEoPJT0plj5kf3OW+W+W68tKzqlZS4JeY1qKUJIUmrr2xBUrKkQUlCA6u4i+kEZYifJdA6B4hyqYcYClGJp7D7lfuK1eI7iR8183Q0YyJTwToPua17V+/RLwDwFDxioQBj24tEtVE6IkzTlqlaVd6urTr3o6d1jFUZdTTV6sBIalJDTjQkFpSEnmUOVXWjKw4Kq7FTqS6ihNDTW5jo0DqSdKvJlQZxWlASlqGTBEb5gJFQ1KoyrJxFWJeOnssUY4jVrpiqjy1eTrVp4q1eWKXV1IdXAjJVUsryddVKCmgNLzdaulH5eZJBPZVFCQ6fcQqjC3zKkrNcw69j7KdTq6adLIBOOg4ENX36dul1ZOT8uBrqVJIHYF61qy1J+9V56Z/dD6WaB1YLWA01elSpNDr/MhnseFXWvYHVaytVWP5tLP84fv/AP/aAAgBAxEBPwH6ddlt/Qtk7tIm9D3EIiEw/J8IT3FpDIINJ7r1v82u6njUi+UX3XfPbH80tO1tmWMefpFHj6o0tssf9Cf/2gAIAQIRAT8B+iO6mvoUxa0kK0HdaSib51HdaUFPPfTWlN/SvnttCQjuMne0XGE9x8N6wKe6XjWkGj21pPu3Nt601pXcOyta+j//2gAIAQEABj8C+8F+v+pfl/qUj/kQKn7qf9QZHQOjq6LGjqkvF0Vx/n6ejqXoQ9Xkk6v0LoWMhT/UGrr20evD+B4Sah5p1T/On7nwfF/N04h4gcXT+cSY9XkRT73w/nKB1l/BhQJTT0dA8fLtq6DgXQPq0/m8U8X8fXtR9A1evajAJdFDR6ji6jh/NZK9ov0o+ok19H8+1Vad+Z8H1cQwpLOWoo6eXl/MVVwS6frYSODTAOo96KYppR5eboTqXR4DiGEebx8/L+Y0dfV1dSOoebJGpeXB6Gr1ejC/MPp4vFerqe1R5/fo6dq5GnfT+f8Ai6B4p+9X+eJ+4UF1eXbQ/dr92j1ZDp31dQ+p6PVko+5VXBlZ8+2nbXtowv1+7Wnbp7UDoofa9H1fg9e/x70PYh/F6vTvi6fc07VVwDq696l1D+D4vXtT7g/BhPp96jA7DtUnj39e3x+5p/Nadq9qh17VYev3K/fp97XvTt8Xh6uhYAH+oqn/AHw//8QAMxABAAMAAgICAgIDAQEAAAILAREAITFBUWFxgZGhscHw0RDh8SAwQFBgcICQoLDA0OD/2gAIAQEAAT8hAvChtOWKFgF0j8f/AJFH/S9XleNBRihNGKGgsZPIf/wjG2dn/wAn/aaopCzsmioyn/NPNn/4Tkf8Ch/xDZ2K6mf+H/DZs0SZJxsv+J2dA8VKkXv/AIV/4P8A6P8Ah/7DTAeUu2XxTatoLtI/6gms3/IJWlBSgUsWKQCamFS2H/EUIfETSUf/AMGUlM/4mzZaWf8Ac9UHPbebBBYa8oUE4njxSOfVDcA/d5b/AMl3/jBdf/wILBYWFlJXF1EFkXDcOgoHwpOMdXmP6n/V6Kenw/6ppKCJO/dKI/8AwYj/APGPuTTTLFfMU4Me7/mc1iz3tmHl2eaADfV79Lno/D/qgy+/s+bH/wCBJZpWf/x4LwySaun/AIHOuCm3pYREGdrCzBp/d3Wt6DcpuwX3WX/5BzSgYnv6stdQY481gM81kCWUXnFjRH8rCYrln/8ABH/4iJyvVz/QqfEngvmx8V24V6saa8G6a4CSsO2ikVHkMv8A+AWf/wAJI5Vx+vn/AI94aMpn30XF37o1BLu8g85PuplAd2AgQVDkf6vNipYsf/gC/NV9eqAWQeVNLnAxZgjOG7WnyQ/5NkPkgfPmhB4knizQUjxQZP8AtWQOXL/8E/8A4OImn31ewd6dfFkmbP8AybBjg54AupPJtmnOKZrpcOh3Q2TXdjfGCyxya/TlH1R+cR5peI35VkYf+Q2GysrKyi5c0X7V9j6L4DIrMM6piDKgZChcVx5VROBPzZHMOi2fEhdqTYqJ8e/+BP8AgsWKKkzuqfK5I3ua6iTw6oDj6q2Bhi71csp7oHizZs0G2lIC5UimrGXsoRBtmugcry3jFYnx8UZo2Wmqc6LN+aeVmzXcsWPNm9V2r/yCcY8TY0PNL7cXv6LHxYV4FIKxD91V2izZp0qQlrfm4+LNYixmiW7laR0m/MF5F4mkaNLpyqKaRJaBCga2JEHAXgFSqR5CuF4oBJY6bG+iebK4HD4q6+qi11ChQEs0NGLJ9nmr45vkb/V4j1S5nFiS/Czgz69U6dPmkYVPiqzu39FlDCpPJRU6eqXX40oO6P3SGa3CXl2n2b+L/VbTpkWRjiEDTg73Z7XFBhYsmLu+RCcl5gYZZVmun3TkIutaHtBs7EgMsqBRrjzljI6sEpl0waUlJP2vAoIyxC4dfxxfLvbsg8WBPJeUIcc2MWPVaMQhJ81vCP8AP/Dmus/81vcUB2w0XPQ/59XhcSsUnqkNbrHkK+H7sIryXlsVbOkJE/0/5tlDraTK90hoqxNfH/4iXFMiKi7MVmzdSij2bLR/NvcKulRrkODejrq6N1vpoXGPH/J//AYjzRVxxlmnk/4SWBRI4ogCziuuwQhKbOELuxJ0XkIObP8A/KFZuZ0Y17rlgl/xP6f8LZ6qf/kPLy/5L/8AgP8AhSt7/wDyP//aAAwDAQACEQMRAAAQle4CIBsNN7UuyjOHIMl2r+9Lisz/AKKFOrkQJhR+GPk9Cv1wtRBpM4Nrt399buPmq2w2srdTa7J3XTRGPJoK0M9ePLb6fWmqSuFaNXNW381F0QmNtasW0DYxBYzpBJHPmDRlbEC8v4z0K51DnKphtoVmLHGP/8QAMxEBAQEAAwABAgUFAQEAAQEJAQARITEQQVFhIHHwkYGhsdHB4fEwQFBgcICQoLDA0OD/2gAIAQMRAT8Qj8DZZ5nFvjLLruxY+t82TLx5tvh8DI+ZxOIxsT+lzb7kCczO4jnpCoyWgs+Z5ssssghwXPmH2hZuLDebLPwcJfrAvBd8mW64922PlYPnzYVruwcJUchtsniEtT4eYNUN5i6sQcWmpzePwhZ6fpccn4AXw44ty0h+LNI6yWwkko6mh8vi/SG2ZLMmzzbW33fPjx/Bv4d/H//aAAgBAhEBPxCfH3Pwtltu7Vr3HY8yzwOctRdDwWWe7COpTqZ7sBjJjkMrfwabz4U5Ygeb+B1E/OeHEI4j8K277oASj3HuZDYGFg4PHxOYcgLM03Oz4z8XdPjU+bmRlr68c2j1NwVljO/AHWyYd7jPNk/gsYOJGQ7h+sTrGrfEsksJmSG2b1BjZJ+fcLE2eMs5s8Pwf//aAAgBAQABPxDjKIqagBQNGwUxH86P0/8A4R+jSBqiVoEqXFWpw/5+de4u5N76+XfJs4NRP4f5/wDwsUVoUHZKBsnVZMUotIRNA7rkm+Ze0qeaLzTQ/wDhv/4RP2KkWWjQUkgoLzWBNeKPlZr2iSiKQ/5n+gg9pF8uVX/R3kh8Wdhd5LEI/wCYZulZXK8qXneNJUsPiklBLwGKyMD80I3FRSBTq5lFx5TD/wCIIL0l9d56lWhRGxKzmq6qOr4NFhMQbB34CoASTZzHT6qqESlGgVCwLydT2ePF4uxKl8OwSYvKH/Jg0Vn/AMmKpRFFxcqmY5AH8WcLMd2QdlgSS/cS5Ppq5SNVr/491q3WvDFAnChXjpP3/N54QjSwBWMXU2JE0sCgUoWKNA5jbMDgh6In7r64TvE+7DtioLET7KhCPIol75y8OXqqgOncb+3rijzc6H5Dy7/NGsTIUj5N1RGbkWEoqV0TRUdHZUdncvFIV5xGfdI1/wA+alOm/H9GXRiMlNl6ocWQh+yiAFcnAAz0+Gypzx2x28x4/FeSBh/K6bohP+gP7pmLSPmogaLUGlP+n/CdKNpEVxE0Tq6Co+GwXGPh/wAKxDTr/wA5uAegDhfPwXjWSR0d/wDlBMsndBx8qtGbweH2PTdCDc8yORSrYBy+1V+WrZf/AMIUSCpweLMhEPBi972UrMOeEPmGSmmZu9PzU7PxqRJUn0UCR21qqQann5bOBjZjgf6quEgll1q/9CWx/wClKFSy7AStELzPdn2/6vRfKn4I77asvh2hj8NUsDhGfDZ8B7iigJuqXuIAh+GlqCOqHPjgh2nPxBIqlr/xQ/8AEWKFBsriwH9vosfzNu/R4LJ3T6TgHmjHEokh9z+qyAMmOJ7igqkPCfdGYDHsegBvN1PflGHh7KsMgP8AO3YasXleH/dh1W4aa/4ChYsjBREQAp6dD+/d7R0f9Tfqmv2SAfukxJKUpacD82DzThZAl4l4snBSPG16nFvGv4NRMSjtPRZ8Ts0wIU6mReDy0Y0gZ8wS839PIf7O6pVLw2FKUpZsG+GWPzZKBVGEjuDx882H6oAMc8rjn6pi8kozqT8xZxiIR9jWVkpSEDEx0+q0lCnUHIfiKdEOEc5UbDudaCBA8/w1SSDLlUaWYYGC+Hw+6v6knp/vilAQjCe7C18V9VPBTx08dA0j+Vw/U1WCYcuD0Hq4ZJHBny0MrgByPh/qgsBnEnJJ+KKIjRxPpr/ZgHj5i4Bhua0e7wwA8eVJ7MjQFh9cEl53v3fJPX+6Qs/NYJ6PnuueK40sPF5lm8VWh7psAi05TrfB1SizyD34+7Ps2wYfd7uPLw8CcF2oQAA6C+Sg4hmWCCfruqNWT9tlMxD5Mvax65pGpvLaMoeXrn/VINUsrKWTY91qAB7D9XgEKw8Q7lHZL9RSZ/5L5+KCS15fN7RLz/pYsTh35+KBxhZCF31eYLAg4jl+X/mZ3l5Map5Hk/uqnO9r06G5Eu6MIm52kjH/AATRKxHHU0M0Yh5+KwE8dn5+b5mcvn4rAJYuIfgPNKJBDOEPHyX26MfBQuIOJ4e7DDkSyz4p0XfHu7sjTKrMIqJ4Cqrzq8Dh+9oCK3ErImsBYkkocXfNRQsQqD4y/HJUDnQ/b/28YIGNkyAPC3VKe+T80GJZU5Z916YKaxPmzgC1D+aJk+zEpropzBPVNSn05s8ZKkXgKrUSAOXNApHA8DAPXNHIinUuOabkpZIjR6bgRRPE5TSCPPCl5IdNhPP1SRHCkeUVY5OEsDSUqy4JO8Nnn7GNefd5RGL5bB8e0T8+bNGWPWRXFiccn2dlkLb/APU6r5XoXfvwfuxUq8gwDgCsJJEp0HR9VNJ9592Fedh+KkM5dqAtPccRQkhMyXI8f7qccJRCcR5uicDxHmf6sETYHifFfvQ5Omrsgnjn8f6qVuVJAIWX44++K+YOCc3qtcW2OL9VEq4nifmsv1aCAaNa3pLwxRKEaW/qAp4uZPfUx22BxMB0GhdSiyAbofxWWFRC0mdFjmN3ihT0x7I/xr8ggQxpmR44s4MDkTG/uhqwA8Q13DNlBHCD5iqgUgj2sZ+7gKRPP/2s2AyBgnn+qYKBTntOeAHMFRfcZZHNHHCqVntiKKEmTQQWpCwJl/FFpygR/nVHyHXWPiYpwDScRPjc1Xcy9jpPEf5FVISGQ4GXiwnl43z5qx9iHBETJQM5lkHQ9UElpMCxxYPI4B0P95WSAZ/dM++Edoj5ingQTU4JjfmhEYEt+Oq1xI/X17okxEY7DXZKTJ4ZLllsUNHuh+bGz3RstM7l78FYxIR3/O9vD+M5ERx81AetmBCxxhPxYHiPVUOBj7CiImMMHk9V0RIZnr7so6PE1Yk6NnmsODLOfj8ZeggFRwXfBVJWzzyBORP92GQcJakbSFmaOzZ2uMsdrBoIPGT80U46eBbzalTR8VzYnxdS4PFjMJ8VxRTX8Y62LSSwAzuXzQOmWZ4jqKAmAbiH5r2PKE0k/qzoBbeFnookff5rZ2t5vDZRyy1aVZLDlG8tBGeLKhpaqZTXLn3+LgiYDPBYEy581BM92TOr5NGhX/r/ANaogr2e7LViF/6NaUCZu2GrWbqgQuJixn/4v//Z" alt="足球比赛现场"><div><h2>补时绝杀！蓝军客场2比1带走三分</h2><p>比赛快讯 · 刚刚</p></div></div>
+              <div class="comment"><div class="avatar">林</div><div><div class="author">林间看球 <span class="ai">AI</span></div><p class="comment-text">最后十分钟的换人彻底改变了节奏，这场逆转不只是运气。</p><div class="meta"><span id="commentAge">刚刚</span><span class="likes">♥ <b id="commentLikeValue">77</b></span><span>回复</span></div></div></div>
+              <div class="target-note">评论区按服务端原始点赞数排序；显示点赞数会逐分钟增加，2小时达到目标值。</div>
+            </div>
+          </div>
+        </div>
+        <div class="specification">
+          <section class="rule calc"><h2>核心逻辑</h2><ul>
+            <li>每条评论的目标点赞数由服务端预先决定。</li>
+            <li>当前点赞 = 服务端目标点赞 × 当前时间进度，结果按<strong>四舍五入</strong>取整。</li>
+            <li>点赞在2小时内逐步完成：发布时20%、30分钟45%、1小时65%、1.5小时80%、2小时100%。</li>
+            <li>两个时间点之间按分钟慢慢增加，点赞数只能增加，不能突然减少。</li>
+            <li>评论区排序始终依据服务端预先确定的<strong>原始点赞数</strong>，不使用随时间浮动后的当前显示数。</li>
+          </ul></section>
+          <section class="rule"><h2>例子</h2><div class="example">服务端目标值是 <strong>386</strong>：刚发布显示77，30分钟显示174，1小时显示251，2小时显示386。</div></section>
+        </div>
+      </div>
+    </section>
+
+    <section class="module" id="reply-likes-module">
+      <header class="module-head">
+        <span class="module-number">2</span>
+        <div><h1>Reply Likes</h1><p>回复内容发布后怎么生成点赞数</p></div>
+      </header>
+      <div class="module-body">
+        <div class="prototype">
+          <div class="prototype-inner">
+            <div class="control">
+              <div class="control-top"><div><span>回复发布后</span><strong id="replyTimeLabel">0 分钟</strong></div><div><span>父评论目标</span><strong>386 赞</strong></div></div>
+              <input id="replyTime" type="range" min="0" max="60" step="1" value="0" aria-label="调整回复发布时间">
+              <div class="presets" data-control="reply"><button type="button" data-value="0" class="active">0分</button><button type="button" data-value="15">15分</button><button type="button" data-value="30">30分</button><button type="button" data-value="45">45分</button><button type="button" data-value="60">1小时</button></div>
+            </div>
+            <div class="phone-panel reply-demo">
+              <div class="parent-summary"><span>父评论服务端目标</span><strong>386 赞</strong></div>
+              <div id="replyLikeList"></div>
+            </div>
+          </div>
+        </div>
+        <div class="specification">
+          <section class="rule calc"><h2>核心逻辑</h2><ul>
+            <li>每条回复的目标点赞数由服务端预先决定。</li>
+            <li>回复发布后才开始增长，当前点赞 = 服务端目标点赞 × 回复发布时间进度。</li>
+            <li>点赞在1小时内逐步完成：发布时10%、15分钟40%、30分钟65%、45分钟85%、1小时100%。</li>
+            <li>相邻时间点之间按分钟增加，结果按<strong>四舍五入</strong>取整。</li>
+          </ul></section>
+          <section class="rule"><h2>例子</h2><div class="example">某条回复的服务端目标值是 <strong>34</strong>：刚发布显示3，30分钟显示22，1小时显示34。</div></section>
+        </div>
+      </div>
+    </section>
+
+    <section class="module" id="reply-schedule-module">
+      <header class="module-head">
+        <span class="module-number">3</span>
+        <div><h1>Reply Schedule</h1><p>3～5条机器回复怎么分批发布</p></div>
+      </header>
+      <div class="module-body">
+        <div class="prototype">
+          <div class="prototype-inner">
+            <div class="control">
+              <div class="schedule-tools"><button class="icon-button" id="schedulePlay" type="button" aria-label="播放回复生成">▶</button><div class="schedule-status"><span>评论发布后</span><strong id="scheduleTimeLabel">0 秒</strong></div><button class="icon-button" id="scheduleReset" type="button" aria-label="重置回复生成">↺</button></div>
+              <input id="scheduleTime" type="range" min="0" max="25" step="0.25" value="0" aria-label="调整回复生成时间">
+              <div class="presets" data-control="schedule"><button type="button" data-value="0" class="active">0分</button><button type="button" data-value="2">2分</button><button type="button" data-value="6">6分</button><button type="button" data-value="12">12分</button><button type="button" data-value="20">20分</button></div>
+            </div>
+            <div class="phone-panel">
+              <div class="comment"><div class="avatar">林</div><div><div class="author">林间看球 <span class="ai">AI</span></div><p class="comment-text">最后十分钟的换人彻底改变了节奏，这场逆转不只是运气。</p><div class="meta"><span id="scheduleSummary">0 条回复</span></div></div></div>
+              <div class="schedule-list" id="scheduleList"><p class="schedule-empty">回复将在稍后逐条出现</p></div>
+            </div>
+          </div>
+        </div>
+        <div class="specification">
+          <section class="rule calc"><h2>发布时间</h2>
+            <table class="schedule-table"><thead><tr><th>回复</th><th>等待时间</th></tr></thead><tbody><tr><td>第1条</td><td>评论发布后30～90秒</td></tr><tr><td>第2条</td><td>第1条后再等1～2分钟</td></tr><tr><td>第3条</td><td>第2条后再等3～5分钟</td></tr><tr><td>第4条</td><td>第3条后再等4～7分钟</td></tr><tr><td>第5条</td><td>第4条后再等6～10分钟</td></tr></tbody></table>
+          </section>
+          <section class="rule"><h2>核心逻辑</h2><ul>
+            <li>前两条快速出现，后面的间隔越来越长；不能一次全部发出。</li>
+            <li>到达计划时间才发布，发布后才开始计算该回复的点赞。</li>
+          </ul></section>
+          <section class="rule edge"><h2>停止条件</h2><ul><li>评论被删除、隐藏或关闭互动时，取消所有还没有发布的机器回复。</li></ul></section>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script>
+    const COMMENT_TARGET = 386;
+    const commentCurve = [[0,.20],[30,.45],[60,.65],[90,.80],[120,1]];
+    const replyCurve = [[0,.10],[15,.40],[30,.65],[45,.85],[60,1]];
+    const replyLikeData = [
+      {initial:'杰',author:'看台阿杰',text:'换上年轻边锋之后，右路终于把空间拉开了。',target:19},
+      {initial:'王',author:'足球老王',text:'关键还是中场开始敢向前传。',target:27},
+      {initial:'南',author:'南看台',text:'绝杀很精彩，门将的扑救同样关键。',target:34}
+    ];
+    const scheduleData = [
+      {at:.78,initial:'杰',author:'看台阿杰',text:'换上年轻边锋之后，右路终于把空间拉开了。'},
+      {at:2.27,initial:'王',author:'足球老王',text:'关键还是中场开始敢向前传。'},
+      {at:6.37,initial:'南',author:'南看台',text:'绝杀很精彩，门将的扑救同样关键。'},
+      {at:11.63,initial:'十',author:'第十二人',text:'这三分对争四太重要了。'},
+      {at:19.68,initial:'周',author:'周末有球',text:'补时还敢压出去进攻，值得肯定。'}
+    ];
+    function progress(curve,minute){
+      if(minute<=curve[0][0]) return curve[0][1];
+      for(let i=1;i<curve.length;i+=1){
+        const [endMinute,endValue]=curve[i]; const [startMinute,startValue]=curve[i-1];
+        if(minute<=endMinute){const position=(minute-startMinute)/(endMinute-startMinute); return startValue+(endValue-startValue)*position;}
+      }
+      return 1;
+    }
+    function timeText(minute){
+      if(minute<1) return `${Math.round(minute*60)} 秒`;
+      if(minute<60) return `${Math.floor(minute)} 分钟`;
+      if(minute<1440){const h=Math.floor(minute/60);const m=Math.floor(minute%60);return m?`${h} 小时 ${m} 分钟`:`${h} 小时`;}
+      return '24 小时';
+    }
+    function activatePreset(group,value){
+      document.querySelectorAll(`[data-control="${group}"] [data-value]`).forEach(button=>button.classList.toggle('active',Number(button.dataset.value)===value));
+    }
+    function renderCommentLikes(){
+      const minute=Number(document.getElementById('commentTime').value);
+      document.getElementById('commentTimeLabel').textContent=timeText(minute);
+      document.getElementById('commentAge').textContent=minute?timeText(minute):'刚刚';
+      document.getElementById('commentLikeValue').textContent=Math.round(COMMENT_TARGET*progress(commentCurve,minute));
+      activatePreset('comment',minute);
+    }
+    function renderReplyLikes(){
+      const minute=Number(document.getElementById('replyTime').value);
+      document.getElementById('replyTimeLabel').textContent=timeText(minute);
+      document.getElementById('replyLikeList').innerHTML=replyLikeData.map(item=>`<div class="reply-like-row"><div class="avatar reply">${item.initial}</div><div><div class="author">${item.author} <span class="ai">AI</span></div><p>${item.text}</p></div><div class="reply-count"><strong>♥ ${Math.round(item.target*progress(replyCurve,minute))}</strong><span>当前点赞</span></div></div>`).join('');
+      activatePreset('reply',minute);
+    }
+    function renderSchedule(){
+      const minute=Number(document.getElementById('scheduleTime').value);
+      const published=scheduleData.filter(item=>minute>=item.at);
+      document.getElementById('scheduleTimeLabel').textContent=timeText(minute);
+      document.getElementById('scheduleSummary').textContent=`${published.length} 条回复`;
+      document.getElementById('scheduleList').innerHTML=published.length?published.map(item=>`<div class="scheduled-reply"><div class="avatar reply">${item.initial}</div><div><div class="author">${item.author} <span class="ai">AI</span></div><p>${item.text}</p><time>${timeText(minute-item.at)}前发布</time></div></div>`).join(''):'<p class="schedule-empty">回复将在稍后逐条出现</p>';
+      activatePreset('schedule',minute);
+    }
+    function bindPresets(group,inputId,render){
+      document.querySelectorAll(`[data-control="${group}"] [data-value]`).forEach(button=>button.addEventListener('click',()=>{document.getElementById(inputId).value=button.dataset.value;render();}));
+    }
+    document.getElementById('commentTime').addEventListener('input',renderCommentLikes);
+    document.getElementById('replyTime').addEventListener('input',renderReplyLikes);
+    document.getElementById('scheduleTime').addEventListener('input',renderSchedule);
+    bindPresets('comment','commentTime',renderCommentLikes);
+    bindPresets('reply','replyTime',renderReplyLikes);
+    bindPresets('schedule','scheduleTime',renderSchedule);
+    let scheduleTimer=null;
+    document.getElementById('schedulePlay').addEventListener('click',()=>{
+      const button=document.getElementById('schedulePlay');
+      if(scheduleTimer){clearInterval(scheduleTimer);scheduleTimer=null;button.textContent='▶';button.setAttribute('aria-label','播放回复生成');return;}
+      const slider=document.getElementById('scheduleTime'); if(Number(slider.value)>=25) slider.value=0;
+      button.textContent='Ⅱ';button.setAttribute('aria-label','暂停回复生成');
+      scheduleTimer=setInterval(()=>{slider.value=Math.min(25,Number(slider.value)+.25);renderSchedule();if(Number(slider.value)>=25){clearInterval(scheduleTimer);scheduleTimer=null;button.textContent='▶';button.setAttribute('aria-label','播放回复生成');}},120);
+    });
+    document.getElementById('scheduleReset').addEventListener('click',()=>{if(scheduleTimer)clearInterval(scheduleTimer);scheduleTimer=null;document.getElementById('scheduleTime').value=0;document.getElementById('schedulePlay').textContent='▶';renderSchedule();});
+    renderCommentLikes(); renderReplyLikes(); renderSchedule();
+  </script>
+</body>
+</html>
